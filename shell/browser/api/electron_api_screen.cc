@@ -27,6 +27,10 @@
 #include "ui/display/win/screen_win.h"
 #endif
 
+#if BUILDFLAG(IS_LINUX)
+#include "shell/browser/linux/x11_util.h"
+#endif
+
 #if defined(USE_OZONE)
 #include "ui/ozone/public/ozone_platform.h"
 #endif
@@ -131,32 +135,33 @@ void Screen::OnDisplayMetricsChanged(const display::Display& display,
 gfx::Point Screen::ScreenToDIPPoint(const gfx::PointF& point_px) {
 #if BUILDFLAG(IS_WIN)
   return display::win::ScreenWin::ScreenToDIPPoint(point_px);
-#elif defined(IS_OZONE_X11)
-  display::Display display =
-      GetDisplayNearestPoint(gfx::ToFlooredPoint(point_px));
-  gfx::Vector2d delta_px = point_px - display.native_origin();
-  gfx::Vector2dF delta_dip =
-      gfx::ScaleVector2d(delta_px, 1.0 / display.device_scale_factor());
-  return display.bounds().origin() + delta_dip;
-#else  // Wayland
-  return gfx::ToFlooredPoint(point_px);
+#elif BUILDFLAG(IS_LINUX)
+  if (x11_util::IsX11()) {
+    gfx::Point pt_px = gfx::ToFlooredPoint(point_px);
+    display::Display display = GetDisplayNearestPoint(pt_px);
+    gfx::Vector2d delta_px = pt_px - display.native_origin();
+    gfx::Vector2dF delta_dip =
+        gfx::ScaleVector2d(delta_px, 1.0 / display.device_scale_factor());
+    return display.bounds().origin() + delta_dip;
+  }
 #endif
+  return gfx::ToFlooredPoint(point_px);
 }
 
 gfx::Point Screen::DIPToScreenPoint(const gfx::Point& point_dip) {
 #if BUILDFLAG(IS_WIN)
   return display::win::ScreenWin::DIPToScreenPoint(point_dip);
-#elif defined(IS_OZONE_X11)
-  display::Display display =
-      GetDisplayNearestPoint(gfx::ToFlooredPoint(point_dip));
-  gfx::Rect bounds_dip = display.bounds();
-  gfx::Vector2d delta_dip = point_dip - bounds_dip.origin();
-  gfx::Vector2dF delta_px =
-      gfx::ScaleVector2d(delta_dip, display.device_scale_factor());
-  return display.native_origin() + delta_px;
-#else  // Wayland
-  return point_dip;
+#elif BUILDFLAG(IS_LINUX)
+  if (x11_util::IsX11()) {
+    display::Display display = GetDisplayNearestPoint(point_dip);
+    gfx::Rect bounds_dip = display.bounds();
+    gfx::Vector2d delta_dip = point_dip - bounds_dip.origin();
+    gfx::Vector2dF delta_px =
+        gfx::ScaleVector2d(delta_dip, display.device_scale_factor());
+    return display.native_origin() + delta_px;
+  }
 #endif
+  return gfx::ToFlooredPoint(point_dip);
 }
 
 // static
